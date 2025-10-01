@@ -14,8 +14,6 @@ Our goal is to create a **plane boarding simulator** that models passenger arriv
 * **Harry Ilanyan** — [harry\_ila@berkeley.edu](mailto:harry_ila@berkeley.edu)
 * **Manuel A. Martinez Garcia** — [manpazito@berkeley.edu](mailto:manpazito@berkeley.edu)
 
-**Potential Clients:** Southwest Airlines, Spirit Airlines (TBD)
-
 ---
 
 ## Significance
@@ -34,8 +32,6 @@ Current methods are often inefficient, leading to:
 
 By developing a robust simulation framework, this project addresses a **real-world enterprise-scale systems engineering problem**. The results will quantify trade-offs between **speed, congestion, and passenger experience**, potentially informing both **academic research** and **airline industry policy decisions**.
 
-This project demonstrates the use of **discrete-event simulation** and **Monte Carlo experimentation**—core tools in **Industrial Engineering & Operations Research (IEOR)**.
-
 ---
 
 ## Methodology
@@ -49,34 +45,33 @@ Implemented in an **object-oriented programming framework** with three main modu
 
   * Arrival time (Poisson arrivals)
   * Walking speed
-  * Luggage & stowage behavior
+  * Luggage & stowage behav
   * Boarding group assignment
 * **Simulation Engine** – Executes arrivals, aisle congestion, and seating under different heuristics, with random fluctuations such as swapped positions or delayed stowage.
 
 ### Analytic Techniques
 
-* Performance evaluation of existing strategies.
-* Sensitivity analysis of passenger attributes & random fluctuations.
-* Monte Carlo simulations (10, 30, 100+ runs) for statistical reliability.
-* Potential optimization of **hybrid strategies**.
+- Performance evaluation of existing strategies (random, back-to-front, WILMA, etc.)  
+- Sensitivity analysis on passenger attributes (walking speeds, luggage mix, arrival patterns)  
+- Monte Carlo replications (10–100 runs) for statistical reliability  
+- Potential exploration of hybrid or adaptive strategies  
 
 ---
 
 ## Desired Scope of Results
 
-The study will compare and report on:
+The simulation will produce comparative results across boarding strategies, including:  
 
-* **Total boarding time**
-* **Average & variance of individual boarding times**
-* **Amount & distribution of congestion time**
-* **Variance of congestion across strategies**
+- **Total boarding time**  
+- **Variance and distribution of individual boarding times**  
+- **Congestion levels** (amount and location of aisle blocking)  
+- **Robustness of strategies** under different passenger mixes  
 
-**Deliverables:**
-
-* Simulation code
-* Statistical analyses
-* Visualizations of results
-* Recommendations for effective boarding strategies
+**Deliverables include:**  
+- Simulation code (object-oriented Python)  
+- Statistical analyses of strategies  
+- Visualizations (boarding time plots, congestion heatmaps)  
+- Practical recommendations for effective boarding strategies  
 
 ---
 
@@ -84,13 +79,28 @@ The study will compare and report on:
 
 ```
 plane-boarding-sim/
-│── src/                 # Simulation code
-│── data/                # Passenger distributions, input parameters
-│── notebooks/           # Analysis & experiments
-│── reports/             # Proposal, progress, draft, final reports
-│── README.md            # Project overview
-│── LICENSE              # BSD 2-Clause License
+│── boarding_sim/         # Simulation code (plane, passenger, engine, data)
+│   │── plane.py
+│   │── passenger.py
+│   │── simulation_engine.py
+│   │── data.py
+│── analysis/             # Jupyter notebooks, experiments, results
+│── reports/              # Proposal, progress, draft, final reports
+│── README.md             # Project overview
+│── LICENSE               # BSD 2-Clause License
 ```
+---
+
+## Future Improvements  
+
+The framework is designed to extend beyond this project:  
+
+- Multi-door boarding (front + rear)
+- First-class priority boarding  
+- Wide-body and multi-cabin aircraft with priority rules  
+- Dynamic or adaptive boarding policies  
+- Applications to public transit systems (e.g., BART, buses)  
+- More realistic behaviors 
 
 ---
 
