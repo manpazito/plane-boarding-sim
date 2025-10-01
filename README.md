@@ -75,7 +75,7 @@ The simulation will produce comparative results across boarding strategies, incl
 
 ---
 
-## Repository Structure (planned)
+## Repository Structure
 
 ```
 plane-boarding-sim/
