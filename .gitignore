@@ -57,6 +57,5 @@ Thumbs.db
 # Misc
 *.pyc
 
-# Optional: large generated outputs (uncomment if desired)
-# figures/
-# reports/
+# Results and reports
+results/
