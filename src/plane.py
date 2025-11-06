@@ -1,11 +1,12 @@
 import numpy as np
 
+
 class Seat:
     def __init__(self, row, letter):
         self.row = row
         self.letter = letter
         self.occupied = False
-        
+
     def show_status(self):
         status = "occupied." if self.occupied else "not occupied."
         print(f"Seat {self.row}{self.letter} is {status}")
@@ -13,11 +14,19 @@ class Seat:
     def __repr__(self):
         return f"Seat {self.row}{self.letter}"
 
+
 defaultArrangement = ["A", "B", "C", "aisle", "D", "E", "F"]
 
+
 class Plane:
-    def __init__(self, num_rows, arrangement=defaultArrangement, exemptions=None,
-                 bin_capacity_per_row=4, aisle_shape="▦▦"):
+    def __init__(
+        self,
+        num_rows,
+        arrangement=defaultArrangement,
+        exemptions=None,
+        bin_capacity_per_row=4,
+        aisle_shape="▦▦",
+    ):
         """
         num_rows   (int): Number of rows on plane
         arrangement (list): e.g. ['A','B','C','aisle','D','E','F']
@@ -34,15 +43,15 @@ class Plane:
         # Visual representation for aisle cells (and entrance L-shape)
         # Default is a double-line block '══' but can be customized
         self.aisle_cell = aisle_shape
-        
+
     def generate_plane(self):
         """Build seats and apply exemptions."""
         if self.generated:
-            return self    
+            return self
         # Generate aisle: index 0 is the entrance (outside/door),
         # indices 1..num_rows align with rows 1..N
         self.aisle = [None for _ in range(self.num_rows + 1)]
-        
+
         # Generate seats
         for r in range(1, self.num_rows + 1):
             for token in self.arrangement:
@@ -50,7 +59,7 @@ class Plane:
                     s = Seat(r, token)
                     self.seat_map[(r, token)] = s
         # Apply exemptions
-        for (r, L) in self.exemptions:
+        for r, L in self.exemptions:
             seat = self.seat_map.get((r, L))
             if seat:
                 seat.occupied = True
@@ -78,7 +87,11 @@ class Plane:
             return str(s).center(w)
 
         # Header row (include entrance column at left)
-        header = "Seat ".ljust(6) + fmt_cell("ENT") + "".join(fmt_cell(r) for r in range(1, self.num_rows + 1))
+        header = (
+            "Seat ".ljust(6)
+            + fmt_cell("ENT")
+            + "".join(fmt_cell(r) for r in range(1, self.num_rows + 1))
+        )
         print(header)
         print("-" * len(header))
 
@@ -137,12 +150,15 @@ class Plane:
             return True
         return False
 
+
 # -------------------------------
 # Standard Example with 10 seats
 # -------------------------------
 if __name__ == "__main__":
-    emergency_exits = [(5, 'A'), (5, 'F')]
-    plane = Plane(10, arrangement=defaultArrangement, exemptions=emergency_exits).generate_plane()
+    emergency_exits = [(5, "A"), (5, "F")]
+    plane = Plane(
+        10, arrangement=defaultArrangement, exemptions=emergency_exits
+    ).generate_plane()
 
     # Show the full plane
     plane.show_plane(mode="status")

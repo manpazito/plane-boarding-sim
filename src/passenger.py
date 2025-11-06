@@ -60,33 +60,44 @@ import math
 
 
 class Passenger:
-    def __init__(self, pid, target_row, target_letter,
-                 has_bag=None, missed=False, walk_ticks=1, stow_ticks=None):
+    def __init__(
+        self,
+        pid,
+        target_row,
+        target_letter,
+        has_bag=None,
+        missed=False,
+        walk_ticks=1,
+        stow_ticks=None,
+    ):
         self.pid = pid
-        self.target_row = target_row          # 1-based row number
-        self.target_letter = target_letter    # 'A', 'B', etc.
+        self.target_row = target_row  # 1-based row number
+        self.target_letter = target_letter  # 'A', 'B', etc.
 
-        self.aisle_pos = -1                   # -1 = not yet entered plane
+        self.aisle_pos = -1  # -1 = not yet entered plane
         self.seated = False
 
         # attendance
         self.missed = bool(missed)
 
         # overhead bin behavior
-        self.has_bag = (has_bag if has_bag is not None else (random.random() < 0.8))
-        self.active_delay = 0                 # how many ticks I'm currently blocking aisle
-        self.done_stowing = False             # did I already put my bag up?
+        self.has_bag = has_bag if has_bag is not None else (random.random() < 0.8)
+        self.active_delay = 0  # how many ticks I'm currently blocking aisle
+        self.done_stowing = False  # did I already put my bag up?
 
         # walking/stow timing (discrete ticks)
         self.walk_ticks = max(1, int(walk_ticks))
-        self.walk_timer = 0                   # counts down between allowed steps
+        self.walk_timer = 0  # counts down between allowed steps
         # how many ticks stowing typically takes (None if no bag)
-        self.stow_ticks = (None if not self.has_bag else
-                           (None if stow_ticks is None else int(max(0, stow_ticks))))
+        self.stow_ticks = (
+            None
+            if not self.has_bag
+            else (None if stow_ticks is None else int(max(0, stow_ticks)))
+        )
 
     def step(self, plane):
         # already seated, nothing to do
-        
+
         if self.seated:
             return
 
@@ -97,7 +108,9 @@ class Passenger:
                 plane.aisle[0] = self
             return
 
-        dest_idx = self.target_row  # convert seat row to aisle index (entrance is index 0)
+        dest_idx = (
+            self.target_row
+        )  # convert seat row to aisle index (entrance is index 0)
 
         # If I'm still walking to my row
         if self.aisle_pos < dest_idx:
@@ -145,10 +158,17 @@ class Passenger:
             return
 
 
-def generate_passengers(num_passengers, num_rows, seat_letters=None,
-                        p_have_bag=0.8, p_missed=0.02,
-                        walk_mean=1.0, walk_sd=0.2,
-                        stow_mean=2.0, stow_sd=0.5):
+def generate_passengers(
+    num_passengers,
+    num_rows,
+    seat_letters=None,
+    p_have_bag=0.8,
+    p_missed=0.02,
+    walk_mean=1.0,
+    walk_sd=0.2,
+    stow_mean=2.0,
+    stow_sd=0.5,
+):
     """
     Generate a list of Passenger instances with basic stochastic attributes.
 
@@ -188,7 +208,7 @@ def generate_passengers(num_passengers, num_rows, seat_letters=None,
     passengers = []
     pid = 1
     missed_count = 0
-    for (r, l) in chosen:
+    for r, l in chosen:
         if random.random() < p_missed:
             missed_count += 1
             continue
@@ -201,8 +221,15 @@ def generate_passengers(num_passengers, num_rows, seat_letters=None,
         if has_bag:
             stow_ticks = max(1, int(round(random.gauss(stow_mean, stow_sd))))
 
-        p = Passenger(pid, r, l, has_bag=has_bag, missed=False,
-                      walk_ticks=walk_ticks, stow_ticks=stow_ticks)
+        p = Passenger(
+            pid,
+            r,
+            l,
+            has_bag=has_bag,
+            missed=False,
+            walk_ticks=walk_ticks,
+            stow_ticks=stow_ticks,
+        )
         passengers.append(p)
         pid += 1
 
