@@ -1,7 +1,82 @@
 # -----------------------------------------------
 # simulation.py — Front-to-Back Boarding Simulation
 # -----------------------------------------------
+# LLM Conversation Link: https://chatgpt.com/share/690c27a7-e63c-8009-b2bc-58adb234f21b
 #
+# File Generated Based on the following Outline:
+#
+# -----------------------------------------------
+# simulation.py — Outline for Front-to-Back Boarding Simulation
+# -----------------------------------------------
+
+# 1. IMPORTS
+# Import necessary modules:
+# - random for stochastic behavior
+# - dataclasses for config storage
+# - typing for type hints
+# - Plane and Passenger modules to build the environment and agents
+
+# 2. SIMULATION CONFIGURATION
+# Define a @dataclass 'SimConfig' to hold all simulation parameters:
+# - plane settings (num_rows, bin capacity, seat arrangement)
+# - passenger behavior parameters (probabilities, timing)
+# - random seed and simulation limits (ticks, time series collection)
+
+# 3. QUEUE GENERATION STRATEGY
+# Define a function 'build_front_to_back_queue(passengers)' that:
+# - sorts passengers by ascending target_row (1 → N)
+# - keeps same-row passengers in random order
+# - returns a queue list to represent boarding order
+
+# 4. METRICS / TRACKING CLASS
+# Create a @dataclass 'Metrics' to store:
+# - total boarding ticks
+# - number of seated passengers
+# - per-tick congestion (number of people in aisle)
+# - per-passenger entry and seat timestamps
+# Include helper methods:
+# - 'init_for_population()' to prepare data structures
+# - 'record_congestion()' to log number of active passengers per tick
+
+# 5. SIMULATION HELPERS
+# Define helper functions for each time-step operation:
+# - 'inject_next_if_possible()': let the next passenger enter the plane
+# - 'step_all_passengers()': move each passenger forward one step per tick
+#   (loop from back to front so movements don't overwrite aisle positions)
+# - 'everyone_seated()': check if all passengers have reached their seats
+
+# 6. MAIN SIMULATION LOOP
+# Define 'run_once(cfg: SimConfig)' that executes one full simulation run:
+# - set random seed
+# - create Plane instance and generate its structure (aisle, seats, bins)
+# - generate passengers via 'generate_passengers()'
+# - sort passengers using front-to-back queue
+# - initialize metrics
+# - run discrete-event loop (for t in range(max_ticks)):
+#     1) inject next passenger if entrance open
+#     2) call step() on each active passenger
+#     3) record congestion metrics
+#     4) check stop condition (all seated)
+# - return metrics, plane, passengers at end
+
+# 7. METRIC SUMMARIZATION
+# Write a 'summarize(metrics)' function that computes key statistics:
+# - total boarding time
+# - average time to seat
+# - maximum congestion
+# - optionally export to a dict for plotting or analysis
+
+# 8. MAIN SCRIPT EXECUTION
+# Include a '__main__' guard to:
+# - initialize default config (e.g., 30 rows, 180 passengers)
+# - run one simulation with 'run_once(cfg)'
+# - print results using 'summarize()'
+# - optionally visualize final plane seating layout
+
+# -----------------------------------------------
+# END OF FILE
+# -----------------------------------------------
+
 # This module implements a discrete-time, single-aisle boarding simulator
 # using the Plane and Passenger modules provided in this repo. It follows
 # the outline Ali shared (sections 1–8) and is intentionally compact and
@@ -238,3 +313,4 @@ if __name__ == "__main__":
 
     # Optional quick visualization in console
     # plane.show_plane(mode="status")  # uncomment to see final layout
+
