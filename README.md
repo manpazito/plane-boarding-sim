@@ -163,7 +163,7 @@ If you want more control over GIF creation (font, scale, duration), pass `gif_*`
 ## Development notes / future work
 
 - Add a small CLI wrapper (e.g., `scripts/run_sim.py`) to simplify running common experiments from the terminal.
-- Add a `requirements.txt` or `pyproject.toml` for reproducible environments.
+- Add a `pyproject.toml` for reproducible environments.
 - Add automated tests for core behaviors (aisle indexing, passenger generation, strategy ordering).
 - Add optional post-run archive/cleanup of frames (e.g., delete frames after GIF created) as a configurable flag.
 
