@@ -92,6 +92,7 @@
 
 # 1) IMPORTS
 from __future__ import annotations
+from pathlib import Path
 import random
 from dataclasses import dataclass, field
 from typing import List, Dict, Tuple, Optional, Callable
@@ -544,18 +545,19 @@ def run_once(
             # Call make_gif, include font_path only if provided to satisfy type hints
             if gif_font:
                 func(
-                    frames_dir,
-                    gif_out,
+                    Path(frames_dir),
+                    Path(gif_out),
                     duration_ms=gif_duration,
-                    font_path=gif_font,
+                    font_path=Path(gif_font) if gif_font else None,
                     font_size=gif_font_size,
                     scale=gif_scale,
                 )
             else:
                 func(
-                    frames_dir,
-                    gif_out,
+                    Path(frames_dir),
+                    Path(gif_out),
                     duration_ms=gif_duration,
+                    font_path=Path(gif_font) if gif_font else None,
                     font_size=gif_font_size,
                     scale=gif_scale,
                 )

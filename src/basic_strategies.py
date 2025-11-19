@@ -170,4 +170,5 @@ STRATEGIES = {
     "back_to_front": back_to_front,
     "random": random_order,
     "wilma": wilma,
+    "steffen": steffen,
 }

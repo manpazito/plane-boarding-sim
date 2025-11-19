@@ -1,143 +1,219 @@
-"""Create an animated GIF from plain-text frame snapshots.
+"""
+Create an animated GIF from plain-text frame snapshots.
 
-Usage (from repo root):
-  python3 src/make_gif_from_text_frames.py \
-      --frames-dir reports/animations --out reports/animations/animation.gif \
-      --duration 80
+Usage example:
+    python3 src/make_gif_from_text_frames.py \
+        --frames-dir results/animations \
+        --out results/animations/animation.gif \
+        --duration 80
 
-The script uses Pillow (PIL). If Pillow is not installed, it will print a
-friendly message asking to install it (pip install Pillow).
+Requires Pillow (PIL):
+    pip install Pillow
 """
 
-import argparse
-import glob
-import os
-import sys
+from __future__ import annotations
 
+import argparse
+from pathlib import Path
+import sys
+from typing import List, Optional, Tuple, TYPE_CHECKING
+
+# Runtime Pillow imports
 try:
     from PIL import Image, ImageDraw, ImageFont
 except Exception:
-    print("Pillow is required to run this script. Install with: pip install Pillow")
-    raise
+    Image = None  # type: ignore
+    ImageDraw = None  # type: ignore
+    ImageFont = None  # type: ignore
+
+# Type-checking imports (never executed at runtime)
+if TYPE_CHECKING:
+    from PIL.Image import Image as PILImage
+    from PIL.ImageFont import FreeTypeFont as PILImageFont
+
+
+RGBColor = Tuple[int, int, int]
 
 
 def render_text_to_image(
-    text: str, font: ImageFont.ImageFont, padding=8, bg=(255, 255, 255), fg=(0, 0, 0)
-):
-    # Create a temporary image to measure text size
-    lines = text.splitlines() or [""]
-    max_width = 0
-    total_height = 0
-    draw = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+    text: str,
+    font: "PILImageFont",
+    padding: int = 8,
+    bg: RGBColor = (255, 255, 255),
+    fg: RGBColor = (0, 0, 0),
+) -> "PILImage":
+    """Render a block of plain text into a PIL image with uniform padding."""
 
-    # helper for compatibility across Pillow versions
-    def _text_size(d, s, f):
+    # Ensure we have at least one line
+    lines = text.splitlines() or [""]
+
+    # Temporary img for measuring
+    tmp_img = Image.new("RGB", (1, 1), color=bg)  # type: ignore
+    draw = ImageDraw.Draw(tmp_img)  # type: ignore
+
+    def _text_size(
+        d: ImageDraw.ImageDraw, s: str, f: "PILImageFont"
+    ) -> Tuple[int, int]:
+        """Compatibility helper across Pillow versions."""
         try:
             return d.textsize(s, font=f)
         except Exception:
-            # newer Pillow versions: use textbbox
             bbox = d.textbbox((0, 0), s, font=f)
             return (bbox[2] - bbox[0], bbox[3] - bbox[1])
 
+    max_width = 0
+    total_height = 0
     for line in lines:
         w, h = _text_size(draw, line, font)
         max_width = max(max_width, w)
         total_height += h
 
-    img = Image.new("RGB", (max_width + padding * 2, total_height + padding * 2), color=bg)  # type: ignore
-    draw = ImageDraw.Draw(img)
+    # Final image with padding
+    img = Image.new(
+        "RGB",
+        (max_width + padding * 2, total_height + padding * 2),
+        color=bg,
+    )  # type: ignore
+
+    draw = ImageDraw.Draw(img)  # type: ignore
     y = padding
     for line in lines:
-        draw.text((padding, y), line, font=font, fill=fg)
+        draw.text((padding, y), line, font=font, fill=fg)  # type: ignore
         _, h = _text_size(draw, line, font)
         y += h
+
     return img
 
 
-def make_gif(frames_dir: str, out_path: str, duration_ms: int = 150, font_path: str = None, font_size: int = 16, scale: int = 2):  # type: ignore
-    # Accept either 'frame_00000.txt' or '{strategy}_frame_00000.txt' naming
-    txt_files = sorted(glob.glob(os.path.join(frames_dir, "*frame_*.txt")))
-    if not txt_files:
-        print(f"No frames found in {frames_dir}")
+def make_gif(
+    frames_dir: Path,
+    out_path: Path,
+    duration_ms: int = 150,
+    font_path: Optional[Path] = None,
+    font_size: int = 16,
+    scale: int = 2,
+) -> int:
+    """Create a GIF from a directory of text-frame files."""
+
+    # Check for Pillow
+    if Image is None or ImageDraw is None or ImageFont is None:
+        print("Pillow is required. Install with: pip install Pillow")
         return 1
 
-    # Choose font
-    font = None
-    if font_path and os.path.exists(font_path):
-        try:
-            font = ImageFont.truetype(font_path, font_size)
-        except Exception:
-            font = None
-    if font is None:
-        # fallback to default monospaced-like font if available
-        try:
-            font = ImageFont.load_default()
-        except Exception:
-            font = None
+    if scale < 1:
+        print("Scale factor must be >= 1.")
+        return 1
 
-    # Render each text frame to an image and compute max dimensions so we can
-    # pad frames to a uniform canvas size (avoids jitter when frames differ).
-    rendered = []
-    max_w = 0
-    max_h = 0
+    frames_dir = frames_dir.resolve()
+    out_path = out_path.resolve()
+
+    if not frames_dir.is_dir():
+        print(f"Frames directory does not exist: {frames_dir}")
+        return 1
+
+    # Detect frames like frame_00001.txt or back_to_front_frame_00001.txt
+    txt_files = sorted(frames_dir.glob("*frame_*.txt"))
+    if not txt_files:
+        print(f"No frame text files found in: {frames_dir}")
+        return 1
+
+    # Load font if provided, otherwise fallback
+    font: Optional["PILImageFont"] = None
+    if font_path:
+        font_path = font_path.expanduser()
+        if font_path.is_file():
+            try:
+                font = ImageFont.truetype(str(font_path), font_size)  # type: ignore
+            except Exception:
+                print(f"Warning: Failed to load font at {font_path}, using default.")
+                font = None
+
+    if font is None:
+        try:
+            font = ImageFont.load_default()  # type: ignore
+        except Exception:
+            print("Error: Could not load default font from Pillow.")
+            return 1
+
+    # Render frames
+    rendered: List["PILImage"] = []
+    max_w, max_h = 0, 0
+
     for fn in txt_files:
-        with open(fn, "r", encoding="utf-8") as fh:
+        with fn.open("r", encoding="utf-8") as fh:
             txt = fh.read()
-        img = render_text_to_image(txt, font)  # type: ignore
+        img = render_text_to_image(txt, font)
         rendered.append(img)
         max_w = max(max_w, img.width)
         max_h = max(max_h, img.height)
 
-    # Create final images with uniform size and optional scaling for a larger GIF
-    images = []
+    # Normalize sizes and scale
+    final_images: List["PILImage"] = []
     for img in rendered:
-        base = Image.new("RGB", (max_w, max_h), color=(255, 255, 255))
+        base = Image.new("RGB", (max_w, max_h), color=(255, 255, 255))  # type: ignore
         base.paste(img, (0, 0))
-        if scale and scale != 1:
+        if scale != 1:
             base = base.resize(
-                (base.width * scale, base.height * scale), resample=Image.NEAREST
+                (base.width * scale, base.height * scale),
+                resample=Image.NEAREST,
             )
-        images.append(base)
+        final_images.append(base)
 
-    # Save as GIF; use first image as base
-    base = images[0]
-    others = images[1:]
-    # duration is per-frame in milliseconds
-    base.save(
-        out_path, save_all=True, append_images=others, duration=duration_ms, loop=0
+    # Save animated GIF
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    first, rest = final_images[0], final_images[1:]
+
+    first.save(
+        out_path,
+        save_all=True,
+        append_images=rest,
+        duration=duration_ms,
+        loop=0,
     )
-    print(f"Wrote GIF to {out_path} (frames: {len(images)})")
+
+    print(f"Wrote GIF to {out_path} (frames: {len(final_images)})")
     return 0
 
 
-def main(argv=sys.argv[1:]):
-    p = argparse.ArgumentParser(description="Make GIF from text frames")
-    p.add_argument(
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Create a GIF from text-frame snapshots."
+    )
+    parser.add_argument(
         "--frames-dir",
         default="results/animations",
-        help="Directory with frame_*.txt files",
+        help="Directory containing '*frame_*.txt' files.",
     )
-    p.add_argument(
-        "--out", default="results/animations/animation.gif", help="Output GIF path"
+    parser.add_argument(
+        "--out", default="results/animations/animation.gif", help="Output GIF file."
     )
-    p.add_argument("--duration", type=int, default=150, help="Frame duration in ms")
-    p.add_argument("--font", default=None, help="Optional TTF font path")
-    p.add_argument("--font-size", type=int, default=16, help="Font size for rendering")
-    p.add_argument(
-        "--scale",
-        type=int,
-        default=2,
-        help="Integer scale factor to enlarge output images",
+    parser.add_argument(
+        "--duration", type=int, default=150, help="Milliseconds per frame."
     )
-    args = p.parse_args(argv)
+    parser.add_argument("--font", default=None, help="Optional TTF font file.")
+    parser.add_argument("--font-size", type=int, default=16, help="Font size.")
+    parser.add_argument(
+        "--scale", type=int, default=2, help="Integer scaling factor for output size."
+    )
+    return parser.parse_args(argv)
 
-    os.makedirs(os.path.dirname(args.out), exist_ok=True)
+
+def main(argv: list[str] | None = None) -> int:
+    if argv is None:
+        argv = sys.argv[1:]
+
+    args = parse_args(argv)
+
+    frames_dir = Path(args.frames_dir)
+    out_path = Path(args.out)
+    font_path = Path(args.font) if args.font else None
+
     return make_gif(
-        args.frames_dir,
-        args.out,
+        frames_dir=frames_dir,
+        out_path=out_path,
         duration_ms=args.duration,
-        font_path=args.font,
-        font_size=args.font_size,
+        font_path=font_path,
+        font_size=args["font_size"] if hasattr(args, "font_size") else args.font_size,
         scale=args.scale,
     )
 
