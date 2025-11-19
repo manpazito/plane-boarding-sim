@@ -1,152 +1,130 @@
-Here is an updated, clear, beginner-friendly README that **includes the Team section**, avoids emojis, and is written so **any reader** (classmates, instructors, recruiters, GitHub users) can understand the project easily.
-
-You can paste this directly into your `README.md`.
-
----
-
 # Plane Boarding Simulator
 
-This project simulates how passengers board an airplane.
-It allows different boarding methods (such as back-to-front, WILMA, Steffen, or custom methods) to be tested and compared based on boarding time, congestion, and overall efficiency.
+A discrete-time, agent-based simulation framework for studying commercial aircraft boarding procedures.
+This project models passengers, aircraft geometry, overhead bins, and movement constraints to support controlled experiments in boarding efficiency.
 
-The simulator models individual passengers, their walking speeds, bag-stowing times, seat assignments, and how they interact inside the airplane. Aircraft structures, doors, aisles, seats, and overhead bins are all modeled.
-
-This project was developed for **INDENG 174: Simulation for Enterprise-Scale Systems**, UC Berkeley (Fall 2025).
+Developed for **INDENG 174: Simulation for Enterprise-Scale Systems**, University of California, Berkeley (Fall 2025).
 
 ---
 
-## Team
+## Overview
 
-- **Mathew Mouchamel** — [mathewmouchamel@berkeley.edu](mailto:mathewmouchamel@berkeley.edu)
-- **Ali Younis** — [ayn1s@berkeley.edu](mailto:ayn1s@berkeley.edu)
-- **Harry Ilanyan** — [harry_ila@berkeley.edu](mailto:harry_ila@berkeley.edu)
-- **Manuel A. Martinez Garcia** — [manpazito@berkeley.edu](mailto:manpazito@berkeley.edu)
+The simulator represents an aircraft cabin using seats, overhead bins, and one or more parallel aisle lanes. Passengers are modeled as agents with heterogeneous walking cadences, stow times, baggage characteristics, and seat assignments. During each simulation tick, passengers:
 
----
+- enter through front and/or rear doors
+- traverse available aisle lanes
+- stow baggage in overhead bins
+- wait when blocked
+- take their seat when their row is accessible
 
-## Project Overview
+The simulation records seat times, entry times, congestion per tick, and total boarding duration. Optional ASCII and GIF-based visualizations support qualitative inspection.
 
-This simulator uses a **discrete-time, agent-based model** to recreate the boarding process.
-Each time step ("tick"), passengers:
-
-- enter through a chosen door
-- walk through the aisle
-- stow their baggage
-- wait if blocked
-- sit in their assigned seats
-
-The simulator tracks all interactions, timing, and congestion.
-Results are written to a timestamped folder, and an optional ASCII animation or GIF can be generated.
-
-The codebase is designed to be easy to extend, especially for writing your own boarding strategies.
+The framework is designed for experimentation with queue-ordering strategies and sensitivity analyses.
 
 ---
 
-## Key Features
+# Installation (Recommended)
 
-### Aircraft Modeling
+The repository includes **platform-specific setup scripts** that automatically:
 
-- Supports single-aisle or multi-aisle aircraft
-- Supports front-door, rear-door, or dual-door boarding
-- Seat arrangements and bin capacities are configurable
-- ASCII visualization of the aircraft at each simulation tick
+- detect or validate the local Python installation
+- create a `venv/` virtual environment
+- install dependencies from `requirements.txt`
+- set up `PYTHONPATH`
+- provide a ready-to-run example that executes a small simulation
 
-### Passenger Behavior
-
-- Individualized walking speed
-- Bag/no-bag behavior and stow times
-- Entry door and lane assignment
-- No-show probability
-- Independent state tracking (walking, waiting, stowing, seated)
-
-### Boarding Strategies
-
-Built-in strategies include:
-
-- Back-to-Front
-- Front-to-Back
-- Random
-- WILMA (Window–Middle–Aisle)
-- Steffen Method
-- Grouped or Blocked boarding
-
-Users can also create **custom strategies** through a simple plugin architecture.
-
-### Simulation Engine
-
-- Discrete-time update loop
-- Congestion and timing metrics
-- Reproducibility controls via random seeds
-- Optional animation and GIF export
+These scripts are the **primary and recommended way** to prepare the environment.
 
 ---
 
-## Repository Structure
+## Windows (PowerShell)
 
+From the repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
 ```
-plane-boarding-sim/
-│
-├── README.md
-├── LICENSE
-├── requirements.txt
-│
-├── data/                      ← research papers and references
-│
-├── examples/                  ← Jupyter notebooks for analysis and demos
-│   ├── analysis.ipynb
-│   └── demo.ipynb
-│
-├── results/                   ← automatically-generated simulation outputs
-│
-├── scripts/
-│   ├── setup.sh
-│   └── setup.ps1
-│
-└── src/
-    ├── simulation.py          ← main simulation loop
-    ├── plane.py               ← airplane geometry + door/lane modeling
-    ├── passenger.py           ← passenger movement and state logic
-    ├── basic_strategies.py    ← built-in boarding strategies
-    ├── custom_strategy.py     ← template for custom strategies
-    └── make_gif_from_text_frames.py
+
+This script:
+
+- locates a valid Python interpreter
+- creates and activates `.\venv\`
+- installs dependencies
+- provides a quick test snippet:
+
+```powershell
+  setx PYTHONPATH "$PWD\src" >$null
+  python - <<'PY'
+from simulation import SimConfig, run_once
+from basic_strategies import back_to_front
+
+cfg = SimConfig(num_rows=6, num_passengers=30, seed=42)
+metrics, plane, passengers = run_once(
+    cfg,
+    boarding_strategy=back_to_front,
+    save_frames=True,
+    auto_make_gif=True,
+    gif_duration=120,
+    gif_scale=2,
+)
+print('Total ticks:', metrics.total_ticks)
+PY
+```
+
+To activate the environment later:
+
+```powershell
+.\venv\Scripts\Activate.ps1
 ```
 
 ---
 
-## Installation
+## macOS / Linux
+
+From the repository root:
 
 ```bash
-git clone https://github.com/manpazito/plane-boarding-sim.git
-cd plane-boarding-sim
+./scripts/setup.sh
+```
 
+This performs the same steps as the Windows script:
+
+- creates `venv/`
+- installs dependencies
+- configures `PYTHONPATH`
+- provides a short runnable test simulation
+
+To activate later:
+
+```bash
+source venv/bin/activate
+```
+
+---
+
+# Alternative Installation (Manual)
+
+If you prefer to configure the environment yourself:
+
+```bash
 python3 -m venv venv
-source venv/bin/activate                 # Windows: .\venv\Scripts\Activate.ps1
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
----
-
-## Running a Simulation
-
-Run with a built-in strategy:
+Run a simulation:
 
 ```bash
 python src/simulation.py --strategy back_to_front
 ```
 
-Enable ASCII animation:
-
-```bash
-python src/simulation.py --strategy wilma --animate
-```
-
-Save animation frames and generate a GIF:
+Generate animation frames and a GIF:
 
 ```bash
 python src/simulation.py --strategy steffen --save-frames
 ```
 
-Disable deterministic queueing:
+Disable deterministic queue ordering:
 
 ```bash
 python src/simulation.py --strategy random --no-perfect-queue
@@ -154,7 +132,7 @@ python src/simulation.py --strategy random --no-perfect-queue
 
 ---
 
-## Programmatic Usage
+# Programmatic Usage
 
 ```python
 from simulation import SimConfig, run_once
@@ -168,84 +146,150 @@ print("Total boarding ticks:", metrics.total_ticks)
 
 ---
 
-## Output Format
+# Configuration Reference
 
-Each simulation run produces:
+### SimConfig Parameters
 
-```
-results/{strategy}_{timestamp}/
-    ├── {strategy}_animation_frames/
-    ├── {strategy}_animation.gif      (if --save-frames used)
-    └── {strategy}_results.csv
-```
-
-The CSV file includes:
-
-- Total boarding time
-- Per-passenger entry time
-- Per-passenger seat time
-- Congestion by tick
-- Average seating time
-- Maximum congestion
+| Parameter                       | Description                                  | Default            |
+| ------------------------------- | -------------------------------------------- | ------------------ |
+| `num_rows`                      | Number of aircraft rows                      | 30                 |
+| `seat_arrangement`              | Row layout (e.g., `[A B C aisle D E F]`)     | defaultArrangement |
+| `bin_capacity_per_row`          | Overhead bin units per row                   | 4                  |
+| `num_passengers`                | Number of passengers (capped by total seats) | 180                |
+| `seat_letters`                  | Override seat labels                         | None               |
+| `p_have_bag`                    | Probability passenger has carry-on           | 0.8                |
+| `p_missed`                      | No-show probability                          | 0.02               |
+| `walk_mean`, `walk_sd`          | Walking cadence distribution                 | 1.0, 0.2           |
+| `stow_mean`, `stow_sd`          | Stow time distribution                       | 2.0, 0.5           |
+| `seed`                          | RNG seed                                     | 42                 |
+| `max_ticks`                     | Tick cutoff                                  | 10,000             |
+| `collect_time_series`           | Track per-tick congestion                    | True               |
+| `disable_no_shows_when_filling` | Force full-plane experiments                 | True               |
 
 ---
 
-## Creating Your Own Boarding Strategy
+### run_once Keyword Arguments
 
-Copy the included template:
+| Argument                    | Meaning                             |
+| --------------------------- | ----------------------------------- |
+| `boarding_strategy`         | Callable defining passenger order   |
+| `animate`                   | Show live ASCII animation           |
+| `frame_delay`               | Animation timing                    |
+| `save_frames`               | Persist per-tick ASCII snapshots    |
+| `frames_dir`                | Directory for saved frames          |
+| `perfect_queue`             | Remove intra-group randomness       |
+| `auto_make_gif`             | Automatically convert frames to GIF |
+| `gif_duration`              | Milliseconds per GIF frame          |
+| `gif_font`, `gif_font_size` | Font settings for GIF               |
+| `gif_scale`                 | Scaling factor for GIF rendering    |
 
-```bash
-cp src/custom_strategy.py src/my_strategy.py
+---
+
+# CLI
+
+```
+python src/simulation.py [OPTIONS]
+
+--strategy NAME
+--animate
+--save-frames
+--no-perfect-queue
 ```
 
-Edit the `__call__` method:
+---
+
+# Output Structure
+
+Each simulation produces:
+
+```
+results/{strategy}_{timestamp}/
+    ├── {strategy}_animation_frames/    (optional)
+    ├── {strategy}_animation.gif        (optional)
+    ├── {strategy}_results.csv          (run-level summary)
+    └── {strategy}_passengers.csv       (per-passenger detail)
+```
+
+### `{strategy}_results.csv` includes:
+
+- total boarding ticks
+- seated passenger count
+- average seat time
+- average and maximum congestion
+
+### `{strategy}_passengers.csv` includes:
+
+- passenger ID
+- seat assignment
+- entry and seat timestamps
+- time-to-seat
+- walking cadence, stow time
+- door and lane used
+
+---
+
+# Custom Boarding Strategies
+
+To define a custom strategy:
+
+1. Copy `src/custom_strategy.py` into a new file in `src/`.
+2. Modify the `CustomBoardingStrategy` class.
+3. Ensure the object registers itself into `STRATEGIES`.
+
+Example:
 
 ```python
 class MyStrategy(BoardingStrategy):
     name = "my_strategy"
 
     def __call__(self, passengers):
-        # Example: sort by row then seat letter
         return sorted(passengers, key=lambda p: (p.target_row, p.target_letter))
 ```
 
-Run your strategy:
+Use it:
 
 ```bash
 python src/simulation.py --strategy my_strategy
 ```
 
-Your file automatically registers itself with the global strategy list.
+---
+
+# Examples and Notebooks
+
+Located in `examples/`:
+
+### `demo.ipynb`
+
+- Single-run demonstration
+- Optionally generates a GIF
+- Shows intermediate plane states
+
+### `analysis.ipynb **(WIP)** `
+
+- Runs many simulations using Monte Carlo
+- Aggregates metrics across multiple runs
+- Supports comparative analysis of strategies
+- Sensitivity analysis
 
 ---
 
-## How the Simulation Works (High Level)
+# Reproducibility
 
-1. A plane is created with the specified number of rows, aisles, doors, and bins.
-2. Passengers are generated with seat assignments, walking speeds, and bag properties.
-3. A strategy determines the order passengers line up.
-4. The simulation runs in small time steps:
-
-   - passengers enter through assigned doors
-   - move down aisles
-   - stow bags
-   - wait if blocked
-   - sit when reaching their row
-
-5. The simulator records all times and outputs results.
-
-The system can be used to compare strategies under controlled conditions.
+- Setting `seed` ensures identical stochastic sampling.
+- `perfect_queue=True` removes intra-group randomness.
+- Deterministic simulation engine ensures repeatability given fixed inputs.
 
 ---
 
-## Reproducibility
+# Contributors
 
-- Set `seed` in `SimConfig` to reproduce results exactly
-- Use `--no-perfect-queue` for fully randomized passenger ordering
-- CSV data can be aggregated in `examples/analysis.ipynb`
+- Mathew Mouchamel — [mathewmouchamel@berkeley.edu](mailto:mathewmouchamel@berkeley.edu)
+- Ali Younis — [ayn1s@berkeley.edu](mailto:ayn1s@berkeley.edu)
+- Harry Ilanyan — [harry_ila@berkeley.edu](mailto:harry_ila@berkeley.edu)
+- Manuel A. Martinez Garcia — [manpazito@berkeley.edu](mailto:manpazito@berkeley.edu)
 
 ---
 
-## License
+# License
 
-This project is licensed under the BSD 2-Clause License.
+Released under the **BSD 2-Clause License**.
