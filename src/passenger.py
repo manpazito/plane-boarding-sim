@@ -255,7 +255,7 @@ def generate_passengers(
         has_bag = random.random() < p_have_bag
         stow_ticks = None
         if has_bag:
-            stow_ticks = max(1, int(round(random.gauss(stow_mean, stow_sd))))
+            stow_ticks = max(1, random.gauss(stow_mean, stow_sd))
 
         p = Passenger(
             pid,

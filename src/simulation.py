@@ -101,6 +101,7 @@ import os
 import io
 from contextlib import redirect_stdout
 import argparse
+import csv
 
 # Local modules
 from plane import Plane, defaultArrangement
@@ -157,7 +158,7 @@ class SimConfig:
     disable_no_shows_when_filling: bool = True
 
 
-# 4) METRICS / TRACKING CLASS
+# 3) METRICS / TRACKING CLASS
 @dataclass
 class Metrics:
     total_ticks: int = 0
@@ -191,16 +192,7 @@ class Metrics:
         self.congestion_ts.append(total)
 
 
-# 3) QUEUE GENERATION STRATEGY (front-to-back)
-
-# Queue-building strategies are implemented in `src/basic_strategies.py`.
-# We import the desired strategy (back_to_front) and use it as the default
-# in run_once(). If you need front-to-back or others, import them from
-# `basic_strategies` and pass as `boarding_strategy` to run_once().
-
-# 5) SIMULATION HELPERS
-
-
+# 4) SIMULATION HELPERS
 def _ensure_seat_passenger_method(plane: Plane) -> None:
     """Compatibility: passenger.step() expects plane.seat_passenger().
     Our Plane class exposes Plane.occupy(). If seat_passenger is missing,
@@ -274,7 +266,7 @@ def everyone_seated(passengers: List[Passenger]) -> bool:
     return all(p.seated or p.missed for p in passengers)
 
 
-# 6) MAIN SIMULATION LOOP
+# 5) MAIN SIMULATION LOOP
 
 
 def run_once(
@@ -564,10 +556,60 @@ def run_once(
         except Exception as e:
             print(f"Warning: failed to auto-create GIF: {e}")
 
+    # Write per-passenger CSV with entry/seat timestamps and metadata
+    try:
+        passengers_csv = os.path.join(run_dir, f"{sname}_passengers.csv")
+        with open(passengers_csv, "w", encoding="utf-8", newline="") as pf:
+            writer = csv.writer(pf)
+            header = [
+                "pid",
+                "target_row",
+                "target_letter",
+                "missed",
+                "entry_time",
+                "seat_time",
+                "time_to_seat",
+                "has_bag",
+                "walk_ticks",
+                "stow_ticks",
+                "lane",
+                "entry_door",
+            ]
+            writer.writerow(header)
+            for p in passengers:
+                entry = m.entry_time.get(p.pid)
+                seat = m.seat_time.get(p.pid)
+                if entry is None or seat is None:
+                    time_to_seat = ""
+                else:
+                    try:
+                        time_to_seat = int(seat) - int(entry)
+                    except Exception:
+                        time_to_seat = ""
+
+                writer.writerow(
+                    [
+                        p.pid,
+                        p.target_row,
+                        p.target_letter,
+                        bool(getattr(p, "missed", False)),
+                        entry if entry is not None else "",
+                        seat if seat is not None else "",
+                        time_to_seat,
+                        bool(getattr(p, "has_bag", False)),
+                        getattr(p, "walk_ticks", ""),
+                        getattr(p, "stow_ticks", ""),
+                        getattr(p, "lane", ""),
+                        getattr(p, "entry_door", ""),
+                    ]
+                )
+    except Exception as e:
+        print(f"Warning: failed to write per-passenger CSV: {e}")
+
     return m, plane, passengers
 
 
-# 7) METRIC SUMMARIZATION
+# 6) METRIC SUMMARIZATION
 
 
 def summarize(m: Metrics) -> Dict[str, float]:
@@ -584,7 +626,7 @@ def summarize(m: Metrics) -> Dict[str, float]:
     }
 
 
-# 8) MAIN SCRIPT EXECUTION
+# 7) MAIN SCRIPT EXECUTION
 if __name__ == "__main__":
     # Build config
     cfg = SimConfig(
