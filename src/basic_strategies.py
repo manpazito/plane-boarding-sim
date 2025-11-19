@@ -102,6 +102,23 @@ class Wilma(BoardingStrategy):
         return ordered
 
 
+class Steffen(BoardingStrategy):
+    name = "steffen"
+
+    def __call__(self, passengers: List[Passenger]) -> List[Passenger]:
+        by_row = _group_by_row(passengers)
+        ordered: List[Passenger] = []
+        # Even rows first, then odd rows
+        even_rows = sorted([r for r in by_row.keys() if r % 2 == 0])
+        odd_rows = sorted([r for r in by_row.keys() if r % 2 != 0])
+        for r in even_rows + odd_rows:
+            group = list(by_row[r])
+            # Sort by seat letter to board window to aisle
+            group.sort(key=lambda p: p.target_letter)
+            ordered.extend(group)
+        return ordered
+
+
 class GroupedBoarding(BoardingStrategy):
     """Boards rows in the specified groups.
 
@@ -139,10 +156,12 @@ front_to_back = FrontToBack()
 back_to_front = BackToFront()
 random_order = RandomOrder()
 wilma = Wilma()
+steffen = Steffen()
 
 
-def make_grouped_boarding(groups: List[Tuple[int, int]]) -> GroupedBoarding:
-    return GroupedBoarding(groups)
+def register_strategy(strategy: BoardingStrategy):
+    """Helper so users can easily register custom strategies."""
+    STRATEGIES[strategy.name] = strategy
 
 
 # Export a dictionary of strategies for convenience

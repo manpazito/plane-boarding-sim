@@ -1,5 +1,4 @@
 import random
-import math
 
 # NOTES / TODOs FOR FUTURE PARAMETER RESEARCH
 # ------------------------------------------------------------------
@@ -77,6 +76,16 @@ class Passenger:
         self.aisle_pos = -1  # -1 = not yet entered plane
         self.seated = False
 
+        # Multi-lane / multi-door support
+        # lane: index of aisle lane passenger occupies (None until entered)
+        # aisle_pos: position index within that lane (0..num_rows)
+        self.lane = None
+        # aisle_pos is maintained as before but interpreted relative to lane
+        # when not entered it's -1
+        self.aisle_pos = -1
+        # which door they used to enter ('front' or 'rear')
+        self.entry_door = None
+
         # attendance
         self.missed = bool(missed)
 
@@ -100,45 +109,73 @@ class Passenger:
 
         if self.seated:
             return
+        # haven't entered yet: try to enter via an available entrance slot
+        if self.aisle_pos == -1 and self.lane is None:
+            entrances = {}
+            try:
+                entrances = plane.entrances()
+            except Exception:
+                # backward-compatibility: single primary aisle
+                entrances = {"front": [(0, 0)]}
 
-        # haven't entered the plane yet: try to step into row 1 aisle (index 0)
-        if self.aisle_pos == -1:
-            if plane.aisle[0] is None:
-                self.aisle_pos = 0
-                plane.aisle[0] = self
+            # Choose door based on seat row if both doors available
+            chosen_door = None
+            if "front" in entrances and "rear" in entrances:
+                # rows in back half prefer rear door
+                if self.target_row > (plane.num_rows / 2):
+                    chosen_door = "rear"
+                else:
+                    chosen_door = "front"
+            else:
+                # pick whichever is available
+                chosen_door = next(iter(entrances.keys()))
+
+            # try to find a free entrance slot in any lane for chosen door
+            slots = entrances.get(chosen_door, [])
+            for lane_idx, pos_idx in slots:
+                if plane.aisles[lane_idx][pos_idx] is None:
+                    # occupy this slot
+                    self.lane = lane_idx
+                    self.aisle_pos = pos_idx
+                    self.entry_door = chosen_door
+                    plane.aisles[lane_idx][pos_idx] = self
+                    return
+            # no free entrance now
             return
 
-        dest_idx = (
-            self.target_row
-        )  # convert seat row to aisle index (entrance is index 0)
+        # At this point we are on a lane at self.lane and position self.aisle_pos
+        lane = self.lane if self.lane is not None else 0
 
-        # If I'm still walking to my row
-        if self.aisle_pos < dest_idx:
-            next_idx = self.aisle_pos + 1
-            if plane.aisle[next_idx] is None:
-                # enforce walking cadence: only move when walk_timer == 0
+        dest_idx = self.target_row
+        # Determine movement direction: if entered from front, move increasing index;
+        # if from rear, move decreasing index.
+        from_front = self.entry_door != "rear"
+
+        # If still walking to my row
+        if (from_front and self.aisle_pos < dest_idx) or (
+            not from_front and self.aisle_pos > dest_idx
+        ):
+            next_idx = self.aisle_pos + (1 if from_front else -1)
+            # ensure next cell is free
+            if plane.aisles[lane][next_idx] is None:
                 if self.walk_timer > 0:
                     self.walk_timer -= 1
                     return
-                # move forward
-                plane.aisle[self.aisle_pos] = None
+                # move forward/backward
+                plane.aisles[lane][self.aisle_pos] = None
                 self.aisle_pos = next_idx
-                plane.aisle[self.aisle_pos] = self
-                # reset walk timer (ticks between moves)
+                plane.aisles[lane][self.aisle_pos] = self
                 self.walk_timer = max(0, self.walk_ticks - 1)
             return
 
-        # I am now at my row
+        # I am now at my row (at the row index)
         if self.aisle_pos == dest_idx:
-            # If I'm currently stowing or otherwise blocking, count down
             if self.active_delay > 0:
                 self.active_delay -= 1
                 return
 
-            # Haven't stowed yet and I have a bag → try stowing
             if self.has_bag and not self.done_stowing:
                 if plane.try_stow_bag(self.target_row):
-                    # Bin had space, stow takes stow_ticks if provided else small random
                     if self.stow_ticks is not None:
                         self.active_delay = int(self.stow_ticks)
                     else:
@@ -146,13 +183,12 @@ class Passenger:
                     self.done_stowing = True
                     return
                 else:
-                    # Bin ABOVE my row is full. Spend extra time figuring it out.
                     self.active_delay = max(1, int(round(random.gauss(4, 1.0))))
-                    self.done_stowing = True  # after this delay, assume it's handled
+                    self.done_stowing = True
                     return
 
-            # Either no bag OR bag is already stowed → sit down
-            plane.aisle[self.aisle_pos] = None
+            # sit down: free lane slot and occupy seat
+            plane.aisles[lane][self.aisle_pos] = None
             plane.seat_passenger(self.target_row, self.target_letter)
             self.seated = True
             return

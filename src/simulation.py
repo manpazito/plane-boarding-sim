@@ -99,11 +99,12 @@ import time
 import os
 import io
 from contextlib import redirect_stdout
+import argparse
 
 # Local modules
 from plane import Plane, defaultArrangement
 from passenger import Passenger, generate_passengers
-from basic_strategies import back_to_front
+from basic_strategies import STRATEGIES
 
 # GIF maker (import from sibling module in src/)
 try:
@@ -111,6 +112,18 @@ try:
 except Exception:
     # If import fails (different execution context), we'll call it dynamically later.
     make_gif = None
+
+
+# Try to import any custom strategies so they can register themselves
+# into basic_strategies.STRATEGIES.
+try:
+    # Users can add more imports here, e.g.:
+    # import custom_strategies.my_even_odd_strategy  # noqa: F401
+    # import custom_strategies.window_then_middle    # noqa: F401
+    ...
+except Exception:
+    # It's okay if no custom strategies exist yet
+    pass
 
 
 # 2) SIMULATION CONFIGURATION
@@ -168,8 +181,13 @@ class Metrics:
             self.seat_time.setdefault(p.pid, None)  # type: ignore
 
     def record_congestion(self, plane: Plane):
-        # Count everyone currently occupying an aisle cell (including entrance index 0)
-        self.congestion_ts.append(sum(1 for cell in plane.aisle if cell is not None))
+        # Count everyone currently occupying any aisle cell across lanes
+        try:
+            total = sum(1 for lane in plane.aisles for cell in lane if cell is not None)
+        except Exception:
+            # backward compatibility: single primary aisle
+            total = sum(1 for cell in getattr(plane, "aisle", []) if cell is not None)
+        self.congestion_ts.append(total)
 
 
 # 3) QUEUE GENERATION STRATEGY (front-to-back)
@@ -204,10 +222,11 @@ def inject_next_if_possible(queue: List[Passenger], plane: Plane, t: int, m: Met
     if not queue:
         return
     nxt = queue[0]
-    pre_pos = nxt.aisle_pos
+    pre_entered = not (nxt.lane is None or nxt.aisle_pos == -1)
     nxt.step(plane)
-    if pre_pos == -1 and nxt.aisle_pos == 0:
-        # First time entering
+    # If the passenger wasn't entered and now has a lane/position, record entry
+    now_entered = not (nxt.lane is None or nxt.aisle_pos == -1)
+    if not pre_entered and now_entered:
         if m.entry_time.get(nxt.pid) is None:
             m.entry_time[nxt.pid] = t
         queue.pop(0)
@@ -218,17 +237,36 @@ def step_all_passengers(passengers: List[Passenger], plane: Plane, t: int, m: Me
     To avoid overwriting moves, iterate aisle cells from back to front and call
     step() on the occupant, then handle newly seated timestamps.
     """
-    # Process aisle occupants from farthest back toward the entrance
-    for idx in range(len(plane.aisle) - 1, -1, -1):
-        person = plane.aisle[idx]
-        if isinstance(person, Passenger):
-            before_seated = person.seated
-            person.step(plane)
-            if not before_seated and person.seated:
-                # Seated this tick — record seat time
-                if m.seat_time.get(person.pid) is None:
-                    m.seat_time[person.pid] = t
-                m.seated_count += 1
+    # Build lists of active passengers in aisles and sort them so movement
+    # doesn't overwrite other moves. For front-entering passengers we process
+    # occupants from farthest (highest index) to nearest; for rear-entering
+    # we process from lowest to highest.
+    front_movers = []
+    rear_movers = []
+    for p in passengers:
+        if not isinstance(p, Passenger):
+            continue
+        if p.seated or p.missed:
+            continue
+        if p.lane is None or p.aisle_pos == -1:
+            continue
+        if getattr(p, "entry_door", None) == "rear":
+            rear_movers.append(p)
+        else:
+            front_movers.append(p)
+
+    # Sort front movers by descending position so farthest move first
+    front_movers.sort(key=lambda x: x.aisle_pos, reverse=True)
+    # Sort rear movers by ascending position so farthest (from rear) move first
+    rear_movers.sort(key=lambda x: x.aisle_pos)
+
+    for person in front_movers + rear_movers:
+        before_seated = person.seated
+        person.step(plane)
+        if not before_seated and person.seated:
+            if m.seat_time.get(person.pid) is None:
+                m.seat_time[person.pid] = t
+            m.seated_count += 1
 
 
 def everyone_seated(passengers: List[Passenger]) -> bool:
@@ -299,7 +337,7 @@ def run_once(
         stow_sd=cfg.stow_sd,
     )
     # Decide boarding strategy: use provided function or default to back-to-front
-    strategy = boarding_strategy or back_to_front
+    strategy = boarding_strategy or STRATEGIES["back_to_front"]
     queue = strategy(passengers)
 
     # Human-friendly strategy name used for filenames and reporting
@@ -340,16 +378,22 @@ def run_once(
     if perfect_queue:
 
         def _deterministic_order(q: List[Passenger]) -> List[Passenger]:
-            # Prefer simple heuristics based on strategy name
-            name = getattr(strategy, "__name__", "") or ""
+            # Prefer simple heuristics based on the strategy's name attribute
+            name = ""
+            if hasattr(strategy, "name"):
+                name = getattr(strategy, "name") or ""
+            elif hasattr(strategy, "__name__"):
+                name = getattr(strategy, "__name__") or ""
+
             # Back-to-front: rows descending, then seat letter
-            if "back" in name:
+            if "back" in name and "front" in name:
+                # e.g. "back_to_front"
                 return sorted(q, key=lambda p: (-p.target_row, p.target_letter))
             # Front-to-back: rows ascending
-            if "front" in name:
+            if "front" in name and "back" not in name:
                 return sorted(q, key=lambda p: (p.target_row, p.target_letter))
             # WILMA: deterministic window->middle->aisle order, rows back->front
-            if "wilma" in name:
+            if "wilma" in name.lower():
                 window = {"A", "F"}
                 middle = {"B", "E"}
                 aisle = {"C", "D"}
@@ -369,8 +413,8 @@ def run_once(
                         p.target_letter,
                     ),
                 )
-            # General fallback: preserve the row ordering implied by `q` but
-            # make intra-row ordering deterministic by seat letter
+
+            # Fallback: keep the implicit row order from q but make seats deterministic
             row_order = list(dict.fromkeys([p.target_row for p in q]))
             out: List[Passenger] = []
             for r in row_order:
@@ -540,6 +584,7 @@ def summarize(m: Metrics) -> Dict[str, float]:
 
 # 8) MAIN SCRIPT EXECUTION
 if __name__ == "__main__":
+    # Build config
     cfg = SimConfig(
         num_rows=30,
         seat_arrangement=list(defaultArrangement),
@@ -549,11 +594,48 @@ if __name__ == "__main__":
         max_ticks=20_000,
         collect_time_series=True,
     )
-    # Choose a boarding strategy to run in the example. Use the module-level
-    # default (back_to_front) but allow it to be changed here easily.
-    strategy = back_to_front
 
-    metrics, plane, passengers = run_once(cfg, boarding_strategy=strategy)
+    # --- CLI to choose strategy and options ---
+    parser = argparse.ArgumentParser(description="Plane boarding simulator")
+    parser.add_argument(
+        "--strategy",
+        default="back_to_front",
+        help="Boarding strategy name (see basic_strategies.STRATEGIES)",
+    )
+    parser.add_argument(
+        "--animate",
+        action="store_true",
+        help="Show ASCII animation in the terminal while running",
+    )
+    parser.add_argument(
+        "--save-frames",
+        action="store_true",
+        help="Save text frames and per-run GIF into results/",
+    )
+    parser.add_argument(
+        "--no-perfect-queue",
+        action="store_true",
+        help="Disable deterministic queue ordering inside strategy groups",
+    )
+    args = parser.parse_args()
+
+    # Resolve the strategy from the registry
+    if args.strategy not in STRATEGIES:
+        print("Available strategies:")
+        for k in sorted(STRATEGIES.keys()):
+            print(f"  - {k}")
+        raise SystemExit(f"Unknown strategy: {args.strategy}")
+
+    strategy = STRATEGIES[args.strategy]
+
+    metrics, plane, passengers = run_once(
+        cfg,
+        boarding_strategy=strategy,
+        animate=args.animate,
+        save_frames=args.save_frames,
+        perfect_queue=not args.no_perfect_queue,
+        auto_make_gif=args.save_frames,
+    )
 
     stats = summarize(metrics)
     sname = getattr(
@@ -562,6 +644,3 @@ if __name__ == "__main__":
     print(f"\nBoarding Simulation — Single Run Summary (strategy={sname})")
     for k, v in stats.items():
         print(f"  {k}: {v}")
-
-    # Optional quick visualization in console
-    # plane.show_plane(mode="status")  # uncomment to see final layout
