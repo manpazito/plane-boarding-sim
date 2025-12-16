@@ -130,6 +130,12 @@ Disable deterministic queue ordering:
 python src/simulation.py --strategy random --no-perfect-queue
 ```
 
+Optional: Convert saved text frames to a GIF (standalone tool):
+
+```bash
+python src/make_gif_from_text_frames.py --frames-dir results/animations --out results/animations/animation.gif
+```
+
 ---
 
 # Programmatic Usage
@@ -139,7 +145,15 @@ from simulation import SimConfig, run_once
 from basic_strategies import back_to_front
 
 cfg = SimConfig(num_rows=25, num_passengers=150, seed=42)
-metrics, plane, passengers = run_once(cfg, boarding_strategy=back_to_front)
+metrics, plane, passengers = run_once(
+    cfg,
+    boarding_strategy=back_to_front,
+    perfect_queue=True,          # deterministic ordering within groups
+    save_frames=False,           # set True to write per-tick ASCII frames
+    auto_make_gif=False,         # set True (with save_frames) to auto-create GIF
+    gif_duration=150,            # ms per GIF frame
+    gif_scale=2,                 # scale factor for GIF rendering
+)
 
 print("Total boarding ticks:", metrics.total_ticks)
 ```
@@ -196,6 +210,14 @@ python src/simulation.py [OPTIONS]
 --no-perfect-queue
 ```
 
+Built-in strategies:
+
+- front_to_back
+- back_to_front
+- random
+- wilma
+- steffen
+
 ---
 
 # Output Structure
@@ -232,9 +254,16 @@ results/{strategy}_{timestamp}/
 
 To define a custom strategy:
 
-1. Copy `src/custom_strategy.py` into a new file in `src/`.
-2. Modify the `CustomBoardingStrategy` class.
-3. Ensure the object registers itself into `STRATEGIES`.
+1. Copy `src/custom_strategy.py` into a new file in `src/` (e.g., `src/my_strategy.py`).
+2. Modify the `CustomBoardingStrategy` class (rename, implement `__call__`).
+3. Ensure it registers itself into `STRATEGIES` (the template does this for you).
+4. Make sure the module is imported so registration happens:
+   - Option A: add near the top of `src/simulation.py`:
+     ```python
+     # import your strategy module so it registers into STRATEGIES
+     import my_strategy  # noqa: F401
+     ```
+   - Option B: in a notebook/script, `import my_strategy` before calling `run_once`.
 
 Example:
 
@@ -256,20 +285,10 @@ python src/simulation.py --strategy my_strategy
 
 # Examples and Notebooks
 
-Located in `examples/`:
+Located in `notebooks/`:
 
-### `demo.ipynb`
-
-- Single-run demonstration
-- Optionally generates a GIF
-- Shows intermediate plane states
-
-### `analysis.ipynb **(WIP)** `
-
-- Runs many simulations using Monte Carlo
-- Aggregates metrics across multiple runs
-- Supports comparative analysis of strategies
-- Sensitivity analysis
+- `demo.ipynb`: single-run demonstration, optional GIF, shows intermediate states
+- `analysis.ipynb`: multi-run analysis, comparative metrics, sensitivity analysis
 
 ---
 
