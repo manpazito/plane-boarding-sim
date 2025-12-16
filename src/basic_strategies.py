@@ -103,19 +103,61 @@ class Wilma(BoardingStrategy):
 
 
 class Steffen(BoardingStrategy):
+    """
+    Approximate implementation of the Steffen (2017) boarding method
+    for a 6-across single-aisle cabin (seats A–F).
+
+    Order:
+      1) Window seats (A,F) from back, every other row, then the offset rows
+      2) Middle seats (B,E) with the same pattern
+      3) Aisle seats (C,D) with the same pattern
+    """
+
     name = "steffen"
 
     def __call__(self, passengers: List[Passenger]) -> List[Passenger]:
+        # If the seat layout isn't A–F, fall back to random
+        letters = {p.target_letter for p in passengers}
+        expected = {"A", "B", "C", "D", "E", "F"}
+        if not expected.issubset(letters):
+            return RandomOrder()(passengers)
+
         by_row = _group_by_row(passengers)
+
+        # Back row index:
+        max_row = max(by_row.keys())
+
+        # Seat groups in Steffen order: windows, middle, aisle
+        seat_groups = [
+            {"A", "F"},  # windows
+            {"B", "E"},  # middle
+            {"C", "D"},  # aisle
+        ]
+
         ordered: List[Passenger] = []
-        # Even rows first, then odd rows
-        even_rows = sorted([r for r in by_row.keys() if r % 2 == 0])
-        odd_rows = sorted([r for r in by_row.keys() if r % 2 != 0])
-        for r in even_rows + odd_rows:
-            group = list(by_row[r])
-            # Sort by seat letter to board window to aisle
-            group.sort(key=lambda p: p.target_letter)
-            ordered.extend(group)
+
+        for group_letters in seat_groups:
+            # First wave: rows with same parity as max_row (max, max-2, ...)
+            for start in (max_row, max_row - 1):
+                if start <= 0:
+                    continue
+                for r in range(start, 0, -2):
+                    if r not in by_row:
+                        continue
+
+                    # Take only seats in this seat-group for this row
+                    row_group = [
+                        p for p in by_row[r] if p.target_letter in group_letters
+                    ]
+
+                    # Within row+group, board in a fixed left-to-right order
+                    row_group.sort(key=lambda p: p.target_letter)
+                    ordered.extend(row_group)
+
+        # Safety: if anything was missed (weird seats, etc.), append in original order
+        remaining = [p for p in passengers if p not in ordered]
+        ordered.extend(remaining)
+
         return ordered
 
 

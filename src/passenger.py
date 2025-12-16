@@ -97,12 +97,24 @@ class Passenger:
         # walking/stow timing (discrete ticks)
         self.walk_ticks = max(1, int(walk_ticks))
         self.walk_timer = 0  # counts down between allowed steps
-        # how many ticks stowing typically takes (None if no bag)
-        self.stow_ticks = (
-            None
-            if not self.has_bag
-            else (None if stow_ticks is None else int(max(0, stow_ticks)))
-        )
+        # --- stow timing: continuous + discrete versions ---
+        if not self.has_bag:
+            # no bag → no stow time
+            self.stow_ticks_continuous = None
+            self.stow_ticks = None
+        else:
+            # if caller didn't pass stow_ticks, sample a default here
+            if stow_ticks is None:
+                # default distribution if generate_passengers didn't set it
+                raw = random.gauss(2.0, 0.5)  # you can tune mean / sd
+            else:
+                raw = float(stow_ticks)
+
+            # continuous value for analysis
+            self.stow_ticks_continuous = max(0.0, raw)
+
+            # discrete value for the simulation (number of ticks to wait)
+            self.stow_ticks = max(1, int(round(self.stow_ticks_continuous)))
 
     def step(self, plane):
         # already seated, nothing to do
